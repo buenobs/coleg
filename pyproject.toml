@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "coleg"
+version = "0.1.0"
+description = "Localiza e baixa normas, jurisprudência e tratados do repositório buenobs/leis-bbs"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "typer>=0.12",
+    "rich>=13",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+coleg = "coleg.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/coleg"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
