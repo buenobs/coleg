@@ -184,8 +184,9 @@ def baixar(
     with cliente() as cli:
         for caminho in caminhos:
             try:
-                gravados = baixar_doc(cli, caminho, idx.commit, destino,
-                                      manter_pastas=manter_pastas, formato=formato, anexos=anexos)
+                gravados, avisos = baixar_doc(cli, caminho, idx.commit, destino,
+                                              manter_pastas=manter_pastas, formato=formato,
+                                              anexos=anexos)
             except (ErroDownload, httpx.HTTPError) as e:
                 erro.print(f"✗ {caminho}: {e}")
                 falhas += 1
@@ -193,6 +194,8 @@ def baixar(
             console.print(f"[green]✓[/] {gravados[0]}", soft_wrap=True, highlight=False)
             for extra in gravados[1:]:
                 console.print(f"  [dim]+ {extra}[/]", soft_wrap=True, highlight=False)
+            for aviso in avisos:
+                erro.print(f"  ! {aviso}")
     if falhas:
         raise typer.Exit(1)
 

@@ -204,6 +204,7 @@ def interpretar(texto: str) -> Consulta:
     t = re.sub(r"\bn[º°o]\.?\s*", " ", t)
     t = re.sub(r"(\d)\.(?=\d{3}\b)", r"\1", t)  # 8.666 -> 8666
     t = re.sub(r"(\d+)\s*/\s*(\d{4}|\d{2})\b", lambda m: f"{m[1]} ano:{m[2]}", t)
+    t = re.sub(r"\b(\d+)-([a-z]|\d{1,2})\b", r"\1+\2", t)  # mp 2200-2, dpl 44-a: não separar
     tokens = [tk for tk in re.split(r"[\s\-,;]+", t) if tk]
 
     i = 0
@@ -231,8 +232,8 @@ def interpretar(texto: str) -> Consulta:
                     c.ano = n
                 else:
                     c.palavras.append(tk)
-            elif m := re.fullmatch(r"(\d+)([a-z])", tk):
-                c.numero, c.complemento = int(m[1]), m[2]
+            elif m := re.fullmatch(r"(\d+)(?:\+?([a-z])|\+(\d{1,2}))", tk):  # 44a, 44+a, 2200+2
+                c.numero, c.complemento = int(m[1]), m[2] or m[3]
             elif tk not in PALAVRAS_VAZIAS:
                 c.palavras.append(tk)
             i += 1

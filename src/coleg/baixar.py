@@ -73,16 +73,25 @@ def nome_local(caminho: str) -> str:
     return origem.stem
 
 
+def _dentro(local: Path, pasta: Path) -> bool:
+    return local.resolve().is_relative_to(pasta.resolve())
+
+
 def baixar(
     cli: httpx.Client, caminho: str, ref: str, destino: Path,
     *, manter_pastas: bool = False, formato: str = "md", anexos: bool = False,
-) -> list[Path]:
-    """Baixa um documento (e, se pedido, os arquivos que ele referencia). Devolve o que gravou."""
+) -> tuple[list[Path], list[str]]:
+    """Baixa um documento (e, se pedido, os arquivos que ele referencia).
+
+    Devolve (arquivos gravados, avisos). Os anexos são opcionais: um anexo que falhe ou
+    aponte para fora do repositório/da pasta de destino vira aviso, e o documento é gravado.
+    """
     texto = obter(cli, caminho, ref).decode("utf-8")
     origem = PurePosixPath(caminho)
     base = destino / origem.parent if manter_pastas else destino
     stem = origem.stem if manter_pastas else nome_local(caminho)
-    gravados: list[Path] = []
+    baixados: list[tuple[Path, bytes]] = []
+    avisos: list[str] = []
 
     if anexos:
         pasta_anexos = f"{stem}_anexos"
@@ -92,14 +101,27 @@ def baixar(
                 local = destino / no_repo
             else:
                 local = base / pasta_anexos / PurePosixPath(no_repo).name
+            if no_repo == ".." or no_repo.startswith("../") or not _dentro(local, destino):
+                avisos.append(f"anexo ignorado (fora do repositório ou da pasta de destino): {alvo}")
+                continue
+            try:
+                conteudo = obter(cli, no_repo, ref)
+            except (ErroDownload, httpx.HTTPError) as e:
+                avisos.append(f"anexo não baixado: {alvo} ({e})")
+                continue
+            if not manter_pastas:
                 texto = texto.replace(f"]({alvo})", f"]({pasta_anexos}/{local.name})")
-            local.parent.mkdir(parents=True, exist_ok=True)
-            local.write_bytes(obter(cli, no_repo, ref))
-            gravados.append(local)
+            baixados.append((local, conteudo))
 
     if formato == "txt":
         _, texto = separar_cabecalho(texto)
     arquivo = base / (stem + (".txt" if formato == "txt" else origem.suffix))
     arquivo.parent.mkdir(parents=True, exist_ok=True)
     arquivo.write_text(texto, encoding="utf-8")
-    return [arquivo, *gravados]
+
+    gravados = [arquivo]
+    for local, conteudo in baixados:
+        local.parent.mkdir(parents=True, exist_ok=True)
+        local.write_bytes(conteudo)
+        gravados.append(local)
+    return gravados, avisos
