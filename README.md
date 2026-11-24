@@ -1,6 +1,6 @@
 # coleg
 
-CLI para localizar e baixar normas federais, a Constituição, jurisprudência e tratados do
+CLI e interface web local para localizar e consultar normas federais, a Constituição, jurisprudência e tratados do
 repositório [buenobs/leis-bbs](https://github.com/buenobs/leis-bbs).
 
 O índice é montado a partir de um clone parcial do git que traz só a lista de arquivos
@@ -23,6 +23,21 @@ Ou, para ter o comando disponível em qualquer lugar: `pipx install .`
 ```bash
 coleg atualizar                     # cria/atualiza o índice (rode primeiro)
 ```
+
+### Interface web
+
+```bash
+coleg web
+```
+
+Abra [http://127.0.0.1:8000](http://127.0.0.1:8000) no navegador. Para escolher outra
+porta, use `coleg web --porta 8080`. A interface usa o mesmo índice da CLI e
+carrega o texto do GitHub ao abrir um documento.
+
+Busque por sigla, número ou referência, como `LGPD, art. 5º` ou `CPC, art. 3º, § 2º`.
+No leitor, use o sumário para ir a um artigo e a busca no documento para localizar
+artigos e palavras. Parágrafos, incisos, alíneas e itens reconhecidos aparecem com
+recuos e podem ser acessados pelos resultados da busca no documento.
 
 ### Buscar
 

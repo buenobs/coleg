@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -17,6 +18,7 @@ from .baixar import ErroDownload, baixar as baixar_doc, cliente, obter, separar_
 from .indice import ErroIndice, Indice, atualizar as atualizar_indice, listar_arvore
 from .apelidos import APELIDOS
 from .parser import TIPOS, TRIBUNAIS, Consulta, Documento, interpretar, normalizar, titulo
+from .pesquisa_externa import links_busca, texto_dos_filtros
 
 app = typer.Typer(
     help="Localiza e baixa normas, jurisprudência e tratados do repositório buenobs/leis-bbs.",
@@ -103,6 +105,19 @@ def _resolver(termos: list[str], idx: Indice, todos: bool = False) -> list[str]:
 
 
 @app.command()
+def web(
+    porta: Annotated[int, typer.Option("--porta", min=1, max=65535)] = 8000,
+) -> None:
+    """Abre a interface de consulta legislativa no navegador local."""
+    from .web import servir
+
+    try:
+        servir(porta)
+    except OSError as e:
+        _falhar(f"Não foi possível iniciar a interface web: {e}")
+
+
+@app.command()
 def atualizar() -> None:
     """Cria ou atualiza o índice local (clone parcial, só a lista de arquivos)."""
     with console.status("Sincronizando a árvore do repositório..."):
@@ -128,16 +143,31 @@ def buscar(
     c = _consulta(termos, tipo, numero, ano, tribunal, esfera)
     if c.vazia():
         _falhar("Informe o que buscar. Ex.: coleg buscar lei 8666")
+    texto_externo = " ".join(termos or [])
+    if any(valor is not None for valor in (tipo, numero, ano, tribunal)):
+        texto_externo = texto_dos_filtros(c)
+    links = links_busca(texto_externo, c)
     idx = _abrir()
     docs, total = idx.buscar(c, limite=limite)
     _salvar_busca(docs)
+    if docs and not como_json:
+        _tabela(docs, total)
+    if not como_json or not docs:
+        for link in links:
+            typer.echo(f"{link.fonte} ({link.acervo}): {link.url}", err=not docs)
     if como_json:
-        print(json.dumps([{"titulo": d.titulo, **d.__dict__, "url": url(d.caminho, idx.commit)}
-                          for d in docs], ensure_ascii=False, indent=2))
+        resultados = []
+        for d in docs:
+            item = {"titulo": d.titulo, **d.__dict__, "url": url(d.caminho, idx.commit)}
+            if destinos := links_busca(d.titulo, d):
+                item["links_externos"] = [asdict(link) for link in destinos]
+                if legjur := next((link for link in destinos if link.fonte == "LegJur"), None):
+                    item["url_legjur"] = legjur.url
+            resultados.append(item)
+        print(json.dumps(resultados, ensure_ascii=False, indent=2))
         return
     if not docs:
         _falhar("Nada encontrado.")
-    _tabela(docs, total)
 
 
 @app.command()

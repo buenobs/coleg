@@ -116,7 +116,7 @@ class Indice:
         r = self.con.execute("SELECT * FROM docs WHERE caminho = ?", (caminho,)).fetchone()
         return _doc(r) if r else None
 
-    def buscar(self, c: Consulta, limite: int | None = 50) -> tuple[list[Documento], int]:
+    def buscar(self, c: Consulta, limite: int | None = 50, *, deslocamento: int = 0) -> tuple[list[Documento], int]:
         """Devolve (documentos até o limite, total de correspondências)."""
         onde, params = [], []
         for coluna in ("tipo", "numero", "complemento", "ano", "tribunal", "esfera", "caminho"):
@@ -137,6 +137,10 @@ class Indice:
         )
         if limite:
             sql += f" LIMIT {int(limite)}"
+        elif deslocamento:
+            sql += " LIMIT -1"
+        if deslocamento:
+            sql += f" OFFSET {int(deslocamento)}"
         return [_doc(r) for r in self.con.execute(sql, params)], total
 
 
