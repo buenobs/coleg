@@ -43,3 +43,45 @@ b. Suíte completa: 59 testes passando.
 ### Próximo passo
 
 Fase 2: incluir estaduais, municipais e reguladores na busca, começando pelo teste de contrato com uma amostra real de caminhos.
+
+## 24 e 25/11/2026 — Interface web, pesquisa externa e preparação do deploy
+
+Entrada escrita em 25/11/2026 a partir dos commits `33a85d7` (24/11) e `810a2a9` (25/11).
+
+### Incluído em 24/11 (`33a85d7`)
+
+a. **Interface web** (`src/coleg/web.py`, `src/coleg/static/`): comando `coleg web [--porta]`, em `127.0.0.1:8000` por padrão. Usa o mesmo índice da CLI e carrega o texto do GitHub ao abrir o documento. Tem filtro por acervo, paginação de 20 em 20, sumário, busca no documento e histórico dos 10 últimos acessos (guardado só no navegador).
+
+b. **Leitor de dispositivos** (`src/coleg/leitor.py`): reconhece artigos, parágrafos, incisos, alíneas e itens no Markdown, com âncora para cada um. Aceita referências como `LGPD, art. 5º, § 1º` e `art. 5º da LGPD`. Dependência nova: `markdown-it-py`.
+
+c. **Texto integral oficial** (`src/coleg/fontes.py`): quando o acervo só tem a republicação ou retificação, o leitor busca o texto compilado no Planalto e confere a sequência de artigos antes de usar. Por enquanto, só a Lei 14.133/2021 (194 artigos). Se a busca falhar, mostra o texto do acervo com aviso.
+
+d. **Pesquisa externa** (`src/coleg/pesquisa_externa.py`): links para continuar a consulta no LegJur (legislação, súmulas e jurisprudência) e no TCU (jurisprudência), na web e no `buscar`. No `--json`, cada resultado ganhou `links_externos` e, quando houver, `url_legjur`.
+
+e. **Paginação no índice** (`src/coleg/indice.py`): `Indice.buscar` ganhou o parâmetro `deslocamento`.
+
+f. **Deploy** (`Dockerfile`, `.dockerignore`): imagem para coleg.artes.digital, com gunicorn na porta 8080, usuário sem privilégios e índice em `/var/lib/coleg`, criado na primeira subida. A entrada WSGI é `coleg.web:application`.
+
+### Incluído em 25/11 (`810a2a9`)
+
+a. **Modelo Inicial** (`src/coleg/pesquisa_externa.py`): links para os quatro acervos do portal (legislação, jurisprudências, artigos e modelos). Aparecem em toda busca, qualquer que seja o acervo. Sem termo de busca, abrem a página inicial de cada um.
+
+### Git
+
+a. Os dois commits foram feitos na branch `deploy/coleg-artes-digital`. Em 25/11 a `main` foi levada até `810a2a9` por fast-forward e enviada ao GitHub. A branch de deploy foi mantida.
+
+### Testes
+
+a. 13 testes novos: 12 em 24/11 e 1 em 25/11 (`tests/test_fontes.py` e `tests/test_legjur.py`).
+b. Suíte completa: 72 testes passando.
+
+### Pendências
+
+1. Da avaliação de 20/11, os itens 1 a 7 continuam abertos. O item 8 foi atendido em parte: o `buscar` da CLI já tem testes, mas faltam testes próprios de `indice.py` e dos demais comandos.
+2. Sem teste: a entrada WSGI (`application`), a paginação da web, `separar_referencia` e `static/web.js`.
+3. Confirmar qual versão está no ar em coleg.artes.digital.
+4. O índice do contêiner só é criado se não existir; falta definir como atualizá-lo depois.
+
+### Próximo passo
+
+Conferir a versão publicada e, depois, retomar a Fase 2 (estaduais, municipais e reguladores), começando pelo teste de contrato com uma amostra real de caminhos.
