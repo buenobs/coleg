@@ -41,12 +41,28 @@ def _url_tcu(texto: str) -> str:
     return f"{base}/resultado/todas-bases/{termo}?pb=jurisprudencia-selecionada"
 
 
+def _url_modelo_inicial(texto: str, *, acervo: str, busca: str) -> str:
+    base = "https://modeloinicial.com.br"
+    return f"{base}/{busca}?{urlencode({'q': texto})}" if texto else f"{base}/{acervo}"
+
+
 # Novas fontes registram seus acervos e as respectivas funções de URL aqui.
 DESTINOS = (
     DestinoPesquisa("LegJur", "Legislação", partial(_url_legjur, caminho="legislacao")),
     DestinoPesquisa("LegJur", "Súmulas", partial(_url_legjur, caminho="sumula")),
     DestinoPesquisa("LegJur", "Jurisprudência", partial(_url_legjur, caminho="jurisprudencia")),
     DestinoPesquisa("TCU", "Jurisprudência", _url_tcu),
+)
+
+# O portal permite pesquisar o mesmo termo em qualquer um dos quatro acervos.
+DESTINOS_MODELO_INICIAL = tuple(
+    DestinoPesquisa("Modelo Inicial", rotulo, partial(_url_modelo_inicial, acervo=acervo, busca=busca))
+    for rotulo, acervo, busca in (
+        ("Legislação", "lei", "buscar-lei"),
+        ("Jurisprudências", "jurisprudencia", "buscar-jurisprudencia"),
+        ("Artigos", "artigos", "buscar-artigos"),
+        ("Modelos", "modelos-peticao", "buscar"),
+    )
 )
 
 
@@ -71,11 +87,11 @@ def _acervos(consulta: Consulta | Documento) -> set[str]:
 def links_busca(texto: str, consulta: Consulta | Documento) -> list[LinkPesquisa]:
     """Gera links para os acervos de pesquisa externos aplicáveis à consulta."""
     texto = texto.strip()
-    if not (texto or consulta.esfera):
-        return []
-    acervos = _acervos(consulta)
+    acervos = _acervos(consulta) if texto or consulta.esfera else set()
+    destinos = [destino for destino in DESTINOS if destino.acervo in acervos]
+    destinos.extend(DESTINOS_MODELO_INICIAL)
     return [LinkPesquisa(destino.fonte, destino.acervo, destino.montar_url(texto))
-            for destino in DESTINOS if destino.acervo in acervos]
+            for destino in destinos]
 
 
 def texto_dos_filtros(consulta: Consulta) -> str:

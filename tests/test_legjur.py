@@ -41,8 +41,10 @@ def test_web_oferece_legjur_sem_resultado_e_preserva_dispositivo(indice_local):
     html = web.pagina({"q": ["LGPD, art. 5º, § 2º"]})
     assert "Nenhum documento corresponde" in html
     assert 'href="https://www.legjur.com/legislacao/busca?q=LGPD%2C+art.+5%C2%BA%2C+%C2%A7+2%C2%BA"' in html
-    assert ">Pesquisar no LegJur</a>" in html
+    assert ">Legislação no LegJur</a>" in html
     assert "/jurisprudencia/busca" not in html
+    for acervo in ("Legislação", "Jurisprudências", "Artigos", "Modelos"):
+        assert f">{acervo} no Modelo Inicial</a>" in html
 
 
 def test_cli_mantem_json_e_vincula_cada_resultado(indice_local):
@@ -51,8 +53,11 @@ def test_cli_mantem_json_e_vincula_cada_resultado(indice_local):
     documento, = json.loads(resultado.stdout)
     assert documento["url"].startswith("https://raw.githubusercontent.com/")
     assert urlsplit(documento["url_legjur"]).path == "/sumula/busca"
-    assert documento["links_externos"] == [
+    assert [link for link in documento["links_externos"] if link["fonte"] == "LegJur"] == [
         {"fonte": "LegJur", "acervo": "Súmulas", "url": documento["url_legjur"]},
+    ]
+    assert [link["acervo"] for link in documento["links_externos"] if link["fonte"] == "Modelo Inicial"] == [
+        "Legislação", "Jurisprudências", "Artigos", "Modelos",
     ]
 
 
@@ -62,9 +67,10 @@ def test_cli_mostra_link_com_filtros_mesmo_sem_resultados(indice_local):
     assert "https://www.legjur.com/legislacao/busca?q=Lei+14133%2F2021" in resultado.stderr
 
 
-def test_jurisprudencia_envia_a_mesma_consulta_para_as_duas_fontes():
+def test_jurisprudencia_preserva_consulta_no_legjur_e_tcu():
     texto = '"dispensa de licitação" 1211/2021 & aditivo'
-    legjur, tcu = links_busca(texto, Consulta(esfera="jurisprudencia"))
+    legjur, tcu = (link for link in links_busca(texto, Consulta(esfera="jurisprudencia"))
+                   if link.fonte in {"LegJur", "TCU"})
     assert (legjur.fonte, tcu.fonte) == ("LegJur", "TCU")
     assert parse_qs(urlsplit(legjur.url).query) == {"q": [texto]}
     partes_tcu = urlsplit(tcu.url)
@@ -76,7 +82,7 @@ def test_jurisprudencia_envia_a_mesma_consulta_para_as_duas_fontes():
     assert parse_qs(partes_tcu.query) == {"pb": ["jurisprudencia-selecionada"]}
 
 
-def test_web_exibe_as_duas_fontes_sem_resultados_locais(indice_local):
+def test_web_exibe_legjur_e_tcu_sem_resultados_locais(indice_local):
     html = web.pagina({"q": ["dispensa de licitação"], "esfera": ["jurisprudencia"]})
     assert "Nenhum documento corresponde" in html
     assert ">Jurisprudência no LegJur</a>" in html
@@ -88,6 +94,10 @@ def test_jurisprudencia_sem_termos_abre_as_paginas_de_pesquisa():
     assert [link.url for link in links_busca("", Consulta(esfera="jurisprudencia"))] == [
         "https://www.legjur.com/jurisprudencia/inicio",
         "https://pesquisa.apps.tcu.gov.br/pesquisa/jurisprudencia",
+        "https://modeloinicial.com.br/lei",
+        "https://modeloinicial.com.br/jurisprudencia",
+        "https://modeloinicial.com.br/artigos",
+        "https://modeloinicial.com.br/modelos-peticao",
     ]
 
 
@@ -96,3 +106,19 @@ def test_cli_oferece_legjur_e_tcu_para_jurisprudencia(indice_local):
     assert resultado.exit_code == 1
     assert "LegJur (Jurisprudência): https://www.legjur.com/jurisprudencia/busca?q=" in resultado.stderr
     assert "TCU (Jurisprudência): https://pesquisa.apps.tcu.gov.br/resultado/todas-bases/" in resultado.stderr
+
+
+def test_modelo_inicial_preserva_consulta_nos_quatro_acervos():
+    texto = '"locação" & art. 5º/2021'
+    links = [link for link in links_busca(texto, Consulta(esfera="federal"))
+             if link.fonte == "Modelo Inicial"]
+    assert [(link.acervo, urlsplit(link.url).path) for link in links] == [
+        ("Legislação", "/buscar-lei"),
+        ("Jurisprudências", "/buscar-jurisprudencia"),
+        ("Artigos", "/buscar-artigos"),
+        ("Modelos", "/buscar"),
+    ]
+    for link in links:
+        partes = urlsplit(link.url)
+        assert (partes.scheme, partes.netloc) == ("https", "modeloinicial.com.br")
+        assert parse_qs(partes.query) == {"q": [texto]}
